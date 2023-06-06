@@ -1,4 +1,4 @@
-GPUS = "5,3,2,4"
+GPUS = "0"
 REORDER = False
 RAW_DATA_DIR = './tmp/raw/'
 FEAT_DATA_DIR = './tmp/feat/'

@@ -69,7 +69,7 @@ def bpr_loss(x, dynamic_user, item_embedding, config):
                 score = du_p_product[t - 1][pos_idx] - du_p_product[t - 1][neg_idx]
                 # Average Negative log likelihood for basket_t
                 nll_u.append(- torch.mean(torch.nn.LogSigmoid()(score)))
-        nll += torch.mean(torch.cat(nll_u))
+        nll += torch.mean(torch.stack(nll_u))
     return nll
 
 
@@ -81,14 +81,17 @@ def train_dream():
     num_batchs = ceil(len(train_ub) / dr_config.batch_size)
     for i, x in enumerate(batchify(train_ub, dr_config.batch_size)):
         baskets, lens, _ = x
-        dr_hidden = repackage_hidden(dr_hidden)  # repackage hidden state for RNN
+
+        # dr_hidden = repackage_hidden(dr_hidden)  # repackage hidden state for RNN
+        dr_hidden = dr_hidden.detach() # modern version
+
         dr_model.zero_grad()  # optim.zero_grad()
         dynamic_user, _ = dr_model(baskets, lens, dr_hidden)
         loss = bpr_loss(baskets, dynamic_user, dr_model.encode.weight, dr_config)
         loss.backward()
 
         # Clip to avoid gradient exploding
-        torch.nn.utils.clip_grad_norm(dr_model.parameters(), dr_config.clip)
+        torch.nn.utils.clip_grad_norm_(dr_model.parameters(), dr_config.clip)
 
         # Parameter updating
         # manual SGD
@@ -107,7 +110,7 @@ def train_dream():
         # Logging
         if i % dr_config.log_interval == 0 and i > 0:
             elapsed = (time() - start_time) * 1000 / dr_config.log_interval
-            cur_loss = total_loss[0] / dr_config.log_interval / dr_config.batch_size  # turn tensor into float
+            cur_loss = total_loss.item() / dr_config.log_interval / dr_config.batch_size  # turn tensor into float
             total_loss = 0
             start_time = time()
             print(
